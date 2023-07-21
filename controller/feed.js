@@ -2,19 +2,24 @@ const { validationResult } = require('express-validator');
 const Post = require('../models/post');
 const path=require('path');
 const fs=require('fs');
-exports.getPosts = (req, res, next) => {                          //Fetching All post
-    Post.find()
-    .then(post=>{
-        res.status(200).json({message:'Successfully Fetched Posts ', posts: post});
-    })
-    .catch(err=>{
+exports.getPosts = async (req, res, next) => {                          //Fetching All post
+  const currentPage=req.query.page || 1;
+  const perPage=2;
+  let totalItems;
+  try{
+  totalItems=await Post.find().countDocuments();
+  const post =await Post.find().skip((currentPage-1) * perPage).limit(perPage);//Fetching PAge with pagination logic
+  res.status(200).json({message:'Successfully Fetched Posts ', posts: post,totalItems: totalItems});
+  }
+  catch(err){
         if(!err.statusCode){
             err.statusCode=500;
         }
         next(err);
-    })
+    }
   };
-  exports.createPost = (req, res, next) => {                                        //Creating A Post
+  exports.createPost = async (req, res, next) => {                                        //Creating A Post
+    try{
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         const error=new Error("Validation failed, entered data is incorrect.");
@@ -35,20 +40,18 @@ exports.getPosts = (req, res, next) => {                          //Fetching All
       imageUrl: imageUrl,
       creator: { name: 'Maximilian' }
     });
-    post
-      .save()
-      .then(result => {
-        res.status(201).json({
+    const result=await post.save()
+    res.status(201).json({
           message: 'Post created successfully!',
           post: result
         });
-      })
-      .catch(err => {
+      }
+      catch(err){
         if(!err.statusCode){
             err.statusCode=500;
         }
         next(err);
-      });
+      };
   };
 
   exports.getPost=(req,res,next)=>{                             //Fetching Single Post

@@ -4,6 +4,7 @@ const bodyparser = require('body-parser');
 const mongoose = require('mongoose');
 const multer=require('multer');
 const feedRoutes = require('./routes/feed');
+const authRoutes=require('./routes/auth');
 const cors=require('cors')
 
 const app = express();
@@ -33,6 +34,7 @@ app.use(multer({storage :fileStorage,fileFilter:fileFilter}).single('image'));
 app.use('/images',express.static(path.join(__dirname,'images')));//Images folder as static folder
 
 app.use('/feed',feedRoutes);
+app.use('/auth',authRoutes);
 app.use((error,req,res,next)=>{
     console.log(error);
     const message=error.message;
