@@ -2,6 +2,8 @@ const { validationResult } = require('express-validator');
 const Post = require('../models/post');
 const path=require('path');
 const fs=require('fs');
+const user=require('../models/user');
+const post = require('../models/post');
 exports.getPosts = async (req, res, next) => {                          //Fetching All post
   const currentPage=req.query.page || 1;
   const perPage=2;
@@ -31,6 +33,7 @@ exports.getPosts = async (req, res, next) => {                          //Fetchi
         error.statusCode=422;
         throw error
     }
+    let creator;
     const imageUrl = req.file.path.replace("\\" ,"/");
     const title = req.body.title;
     const content = req.body.content;
@@ -38,12 +41,20 @@ exports.getPosts = async (req, res, next) => {                          //Fetchi
       title: title,
       content: content,
       imageUrl: imageUrl,
-      creator: { name: 'Maximilian' }
+      creator: req.userId
     });
-    const result=await post.save()
+    const result=await post.save();
+    const User=await user.findOne({_id:req.userId})
+    creator=User;
+    User.posts.push(post);
+    await User.save();
     res.status(201).json({
           message: 'Post created successfully!',
-          post: result
+          post: result,
+          creator:{
+            _id:creator._id,
+            name:creator.name
+          }
         });
       }
       catch(err){
@@ -76,11 +87,15 @@ exports.getPosts = async (req, res, next) => {                          //Fetchi
 
   exports.updatePost=(req,res,next)=>{
     const postId=req.params.postId;
-    console.log("This is ID  " +postId)
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         const error=new Error("Validation failed, entered data is incorrect.");
         error.statusCode=422;
+        throw error;
+    }
+    if(post.creator.toString()!==req.userId){
+      const error=new Error("UnAuthorized");
+        error.statusCode=403;
         throw error;
     }
     const title=req.body.title;
@@ -133,16 +148,34 @@ exports.getPosts = async (req, res, next) => {                          //Fetchi
       error.statusCode=404;
       throw error;
     }
+    if(post.creator.toString()!==req.userId){
+      const error=new Error("UnAuthorized");
+        error.statusCode=403;
+        throw error;
+    }
     clearImage(post.imageUrl);
     await post.deleteOne();
     res.status(200).json({message :'Post Deleted'})
   }
   catch(error){
+    console.log("Error Occured In Delete Post Controller")
     next(error);
   }
 
 };
-
+exports.getStatus=async (req,res,next)=>{
+  console.log(req.userId);
+  const User=await user.findById(req.userId);
+  res.status(200).json({status:User.status})
+}
+exports.updateStatus=async (req,res,next)=>{
+  const newStatus=req.body.status;
+  const User=await user.findById(req.userId);
+  User.status=newStatus;
+  await User.save();
+  res.status(201).json({status:User.status});
+  console.log("status updated")
+}
   const clearImage= filePath =>{
     filePath=path.join(__dirname,'..',filePath);
     fs.unlink(filePath,(err)=>{console.log(err)})
