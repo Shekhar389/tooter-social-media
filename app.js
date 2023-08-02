@@ -43,9 +43,15 @@ app.use((error,req,res,next)=>{
 })
 mongoose
   .connect(
-    'mongodb+srv://kshekhar2807:mKMIOJ2RI6Q6gawO@cluster0.gcxkevb.mongodb.net/tooter?retryWrites=true&w=majority'
+    ''
   )
   .then(result => {
-    app.listen(8080);
+    
+    const SERVER=app.listen(8080);
+    //Socket Code Here
+    const io = require('./socket').init(SERVER);
+    io.on('connection',socket=>{
+      console.log("Client Socket Connected");
+    })
   })
   .catch(err => console.log(err));

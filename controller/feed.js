@@ -3,15 +3,17 @@ const Post = require('../models/post');
 const path=require('path');
 const fs=require('fs');
 const user=require('../models/user');
-const post = require('../models/post');
+const io = require('../socket');
 exports.getPosts = async (req, res, next) => {                          //Fetching All post
   const currentPage=req.query.page || 1;
   const perPage=2;
   let totalItems;
+  const User=await user.findById(req.userId);
   try{
   totalItems=await Post.find().countDocuments();
-  const post =await Post.find().skip((currentPage-1) * perPage).limit(perPage);//Fetching PAge with pagination logic
-  res.status(200).json({message:'Successfully Fetched Posts ', posts: post,totalItems: totalItems});
+  const post =await Post.find().populate('creator').skip((currentPage-1) * perPage).limit(perPage);//Fetching PAge with pagination logic
+  console.log(post);
+  res.status(200).json({message:'Successfully Fetched Posts ', posts:post,totalItems: totalItems});
   }
   catch(err){
         if(!err.statusCode){
@@ -48,6 +50,8 @@ exports.getPosts = async (req, res, next) => {                          //Fetchi
     creator=User;
     User.posts.push(post);
     await User.save();
+    console.log()
+    io.getIO().emit('posts',{action:'create',post:{...post._doc,creator:{_id:req.userId,name:creator.name}}})
     res.status(201).json({
           message: 'Post created successfully!',
           post: result,
@@ -85,14 +89,16 @@ exports.getPosts = async (req, res, next) => {                          //Fetchi
     })
   }
 
-  exports.updatePost=(req,res,next)=>{
+  exports.updatePost=async (req,res,next)=>{
     const postId=req.params.postId;
     const errors = validationResult(req);
+    try{
     if (!errors.isEmpty()) {
         const error=new Error("Validation failed, entered data is incorrect.");
         error.statusCode=422;
         throw error;
     }
+    const post=await Post.findById(postId);
     if(post.creator.toString()!==req.userId){
       const error=new Error("UnAuthorized");
         error.statusCode=403;
@@ -111,30 +117,23 @@ exports.getPosts = async (req, res, next) => {                          //Fetchi
       throw error;
     }
     console.log("This is Image URL "+imageUrl)
-    Post.findById(postId)
-    .then(post=>{
-      if(!post){
-        const error=new Error("Post Not Found");
-        error.statusCode=404;
-        throw error;
-      }
       if(imageUrl!==post.imageUrl){
         clearImage(post.imageUrl);
       }
       post.title=title;
       post.imageUrl=imageUrl;
       post.content=content;
-      return post.save();
-    })
-    .then(result=>{
+      const result=await post.save();
+    
+    
       res.status(200).json({message : 'Post Updated',post:result})
-    })
-    .catch(err=>{
+    }
+      catch(err){
       if(!err.statusCode){
         err.statusCode=500;
       }
       next(err);
-    })
+    }
   };
 
  exports.deletePost= async (req,res,next)=>{
